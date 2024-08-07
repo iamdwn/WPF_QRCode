@@ -1,0 +1,117 @@
+﻿using System;
+using System.Windows;
+using System.Windows.Media.Imaging;
+using AForge.Video;
+using AForge.Video.DirectShow;
+using ZXing;
+using NAudio.Wave;
+
+namespace WebcamApp
+{
+    public partial class MainWindow : Window
+    {
+        private FilterInfoCollection videoDevices;
+        private VideoCaptureDevice videoSource;
+        private BarcodeReader barcodeReader;
+        private WaveOutEvent waveOut;
+        private AudioFileReader audioFile;
+        private string hasScanned;
+
+        public MainWindow()
+        {
+            InitializeComponent();
+            barcodeReader = new BarcodeReader();
+            InitializeAudio();
+        }
+
+        private void InitializeAudio()
+        {
+            waveOut = new WaveOutEvent();
+            audioFile = new AudioFileReader("beep.wav");
+            waveOut.Init(audioFile);
+        }
+
+        private void ToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (videoSource == null || !videoSource.IsRunning)
+            {
+                StartWebcam();
+            }
+            else
+            {
+                StopWebcam();
+            }
+        }
+
+        private void StartWebcam()
+        {
+            videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+            if (videoDevices.Count > 0)
+            {
+                videoSource = new VideoCaptureDevice(videoDevices[0].MonikerString);
+                videoSource.NewFrame += VideoSource_NewFrame;
+                videoSource.Start();
+                ToggleButton.Content = "Off Webcam";
+            }
+        }
+
+        private void StopWebcam()
+        {
+            if (videoSource != null && videoSource.IsRunning)
+            {
+                videoSource.SignalToStop();
+                videoSource.NewFrame -= VideoSource_NewFrame;
+                videoSource = null;
+                WebcamFeed.Source = null;
+                ToggleButton.Content = "On Webcam";
+            }
+        }
+
+        private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            BitmapImage bi;
+            using (var bitmap = (System.Drawing.Bitmap)eventArgs.Frame.Clone())
+            {
+                bi = new BitmapImage();
+                bi.BeginInit();
+                System.IO.MemoryStream ms = new System.IO.MemoryStream();
+                bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
+                ms.Seek(0, System.IO.SeekOrigin.Begin);
+                bi.StreamSource = ms;
+                bi.EndInit();
+
+                var result = barcodeReader.Decode(bitmap);
+                if (result != null)
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        //ResultText.Text = result.Text;
+                        if (!string.IsNullOrEmpty(hasScanned) && hasScanned.Equals(result.Text)) return;
+                        PlayBeep();
+                        hasScanned = result.Text;
+                        MessageBoxResult messageBoxResult = MessageBox.Show(result.Text, "", MessageBoxButton.OK);
+                        //MessageBox.Show(result.Text, "", MessageBoxButton.OK);
+                        if (messageBoxResult.Equals(MessageBoxResult.OK)) hasScanned = "";
+                        return;
+                    }));
+                }
+            }
+            bi.Freeze();
+            Dispatcher.BeginInvoke(new Action(() => WebcamFeed.Source = bi));
+        }
+
+        private void PlayBeep()
+        {
+            audioFile.Position = 0;
+            waveOut.Play();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            StopWebcam();
+            waveOut.Dispose();
+            audioFile.Dispose();
+            base.OnClosed(e);
+        }
+    }
+}
