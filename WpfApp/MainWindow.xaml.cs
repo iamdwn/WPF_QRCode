@@ -129,7 +129,7 @@ namespace WebcamApp
         private async void InitializeGoogleSheetsService()
         {
             UserCredential credential;
-            using (var stream = new FileStream("D:\\Docm\\Dev\\.learning-process\\C#\\PRN221_B3W\\webcam\\Duongtddse172132_Webcam\\WpfApp\\credentials.json", FileMode.Open, FileAccess.Read))
+            using (var stream = new FileStream("..\\credentials.json", FileMode.Open, FileAccess.Read))
             {
                 credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                     GoogleClientSecrets.Load(stream).Secrets,
