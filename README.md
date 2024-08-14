@@ -1,2 +1,2 @@
-﻿# QRCode-Scanner
+﻿# QRCode Scanner
 
